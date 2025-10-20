@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アニマルチェンジャーAI</title>
+    <!-- Tailwind CSS CDN を読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 使用フォントはInterを設定（Tailwindのデフォルト設定として使用） -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fd; /* 全体的に明るい背景色 */
+        }
+        /* カスタムローディングスピナー */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #3b82f6; /* Tailwind blue-500 */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .container-card {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .container-card:hover {
+             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-4xl">
+
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-5xl font-extrabold text-blue-600 mb-2">
+                アニマルチェンジャーAI
+            </h1>
+            <p class="text-xl text-gray-600">画像の人物を、愛らしい動物キャラクターに変換します。</p>
+        </header>
+
+        <div class="bg-white container-card rounded-3xl p-6 md:p-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+            <!-- 設定エリア (左側) -->
+            <div class="space-y-6">
+                <h2 class="text-2xl font-extrabold text-blue-700 border-b-4 border-blue-100 pb-2 mb-4">
+                    ステップ 1: 入力と設定
+                </h2>
+                
+                <!-- 0. APIキー入力欄 -->
+                <div class="bg-yellow-50 p-5 rounded-xl border border-yellow-200">
+                    <label for="apiKeyInput" class="block text-lg font-bold text-gray-700 mb-2">
+                        0. Gemini APIキーを入力 (外部環境用)
+                    </label>
+                    <input type="password" id="apiKeyInput" placeholder="YOUR_GEMINI_API_KEY" class="w-full p-3 border border-yellow-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    <p class="text-xs text-gray-500 mt-2">※ご自身の環境で実行する場合、[Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key) で取得したキーを設定してください。</p>
+                </div>
+                
+                <!-- 1. 画像アップロード -->
+                <div class="bg-blue-50 p-5 rounded-xl border border-blue-200">
+                    <label for="imageUpload" class="block text-lg font-bold text-gray-700 mb-2">
+                        1. 変換したい写真をアップロード (必須)
+                    </label>
+                    <input type="file" id="imageUpload" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer">
+                    <p class="text-xs text-gray-500 mt-2">※アップロードされた写真の人物のポーズや特徴を元にキャラクターを生成します。</p>
+                    <div id="uploadedImageContainer" class="mt-4 hidden max-w-full h-auto rounded-lg shadow-md overflow-hidden">
+                        <img id="previewImage" class="w-full h-full object-contain" alt="アップロードされた画像プレビュー">
+                    </div>
+                </div>
+
+                <!-- 2. 動物選択と 3. スタイル選択 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-5 rounded-xl border border-green-200">
+                        <label class="block text-lg font-bold text-gray-700 mb-2">
+                            2. 動物を選択
+                        </label>
+                        <select id="animalSelect" class="w-full p-3 border border-green-300 rounded-lg focus:ring-green-500 focus:border-green-500 appearance-none bg-white transition duration-150">
+                            <option value="cat" selected>猫 (Cat)</option>
+                            <option value="dog">犬 (Dog)</option>
+                            <option value="rabbit">ウサギ (Rabbit)</option>
+                            <option value="fox">狐 (Fox)</option>
+                            <option value="bear">熊 (Bear)</option>
+                            <option value="panda">パンダ (Panda)</option>
+                            <option value="owl">フクロウ (Owl)</option>
+                        </select>
+                    </div>
+                    <div class="bg-red-50 p-5 rounded-xl border border-red-200">
+                        <label class="block text-lg font-bold text-gray-700 mb-2">
+                            3. スタイルを選択
+                        </label>
+                        <select id="styleSelect" class="w-full p-3 border border-red-300 rounded-lg focus:ring-red-500 focus:border-red-500 appearance-none bg-white transition duration-150">
+                            <option value="cartoon style" selected>カートゥーン風</option>
+                            <option value="realistic 3D render">リアルな3Dレンダリング</option>
+                            <option value="watercolor painting">水彩画風</option>
+                            <option value="pixel art">ピクセルアート</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 4. 生成ボタン -->
+                <button id="generateButton" class="w-full py-4 text-xl font-bold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition duration-200 shadow-lg shadow-blue-300/50 flex items-center justify-center disabled:opacity-50" onclick="generateImage()">
+                    <span id="buttonText">4. 動物キャラを生成する</span>
+                    <div id="loadingSpinner" class="spinner hidden ml-3"></div>
+                </button>
+
+                <!-- メッセージボックス -->
+                <div id="messageBox" class="p-3 text-sm rounded-lg text-center hidden"></div>
+
+            </div>
+
+            <!-- 結果エリア (右側) -->
+            <div class="space-y-6">
+                <h2 class="text-2xl font-extrabold text-green-700 border-b-4 border-green-100 pb-2 mb-4">
+                    ステップ 2: AI生成結果
+                </h2>
+                
+                <!-- 結果画像とダウンロードボタンのコンテナ -->
+                <div id="resultContainer" class="relative w-full aspect-square flex items-center justify-center bg-gray-100 rounded-xl border-dashed border-2 border-gray-300 overflow-hidden">
+                    <p id="placeholderText" class="text-gray-500 p-4">
+                        生成ボタンを押すと、ここに結果が表示されます。
+                    </p>
+                    <img id="generatedImage" class="hidden absolute top-0 left-0 w-full h-full object-contain rounded-xl transition duration-500" alt="生成された動物キャラクター" style="opacity: 0;">
+                    
+                    <!-- ダウンロードボタン (画像の上にオーバーレイ) -->
+                    <a id="downloadButton" href="#" download="animal_changer_ai_result.png" class="hidden absolute top-4 right-4 py-2 px-4 text-sm font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg transition duration-200 shadow-xl disabled:opacity-50 flex items-center space-x-2 opacity-90 hover:opacity-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L10 11.586l2.293-2.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        <span>画像をダウンロード</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module">
+        // =====================================================================
+        // AI API 設定
+        // =====================================================================
+        // 画像入力対応のモデルを使用
+        const API_MODEL = "gemini-2.5-flash-image-preview";
+        
+        let currentBase64Image = null;
+
+        // =====================================================================
+        // UIエレメントの取得
+        // =====================================================================
+        const apiKeyInput = document.getElementById('apiKeyInput'); // APIキー入力欄
+        const animalSelect = document.getElementById('animalSelect');
+        const styleSelect = document.getElementById('styleSelect');
+        const generateButton = document.getElementById('generateButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const resultContainer = document.getElementById('resultContainer');
+        const placeholderText = document.getElementById('placeholderText');
+        const generatedImage = document.getElementById('generatedImage');
+        const downloadButton = document.getElementById('downloadButton');
+        const messageBox = document.getElementById('messageBox');
+        const imageUpload = document.getElementById('imageUpload');
+        const previewImage = document.getElementById('previewImage');
+        const uploadedImageContainer = document.getElementById('uploadedImageContainer');
+
+        // =====================================================================
+        // イベントリスナー
+        // =====================================================================
+        
+        // アップロードされた画像のプレビュー表示とBase64データの取得
+        imageUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            currentBase64Image = null; 
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    uploadedImageContainer.classList.remove('hidden');
+                    
+                    const parts = e.target.result.split(',');
+                    if (parts.length > 1) {
+                        currentBase64Image = {
+                            mimeType: file.type,
+                            data: parts[1] // Base64データ部分
+                        };
+                    }
+                };
+                reader.readAsDataURL(file);
+            } else {
+                uploadedImageContainer.classList.add('hidden');
+            }
+        });
+
+        // =====================================================================
+        // ユーティリティ関数
+        // =====================================================================
+
+        /**
+         * メッセージボックスにエラーまたは成功メッセージを表示する
+         */
+        function displayMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-100', 'text-red-700', 'border', 'border-red-200');
+            } else if (type === 'success') {
+                messageBox.classList.add('bg-green-100', 'text-green-700', 'border', 'border-green-200');
+            }
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        /**
+         * Base64データをBlobに変換するユーティリティ関数（ダウンロード用）
+         */
+        function base64ToBlob(base64, mimeType = 'image/png') {
+            const byteString = atob(base64);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: mimeType });
+        }
+
+        /**
+         * 処理状態を切り替える（ボタンの無効化、スピナーの表示など）
+         */
+        function setProcessingState(isLoading) {
+            generateButton.disabled = isLoading;
+            animalSelect.disabled = isLoading;
+            styleSelect.disabled = isLoading;
+            
+            if (isLoading) {
+                buttonText.textContent = '生成中... しばらくお待ちください';
+                loadingSpinner.classList.remove('hidden');
+                downloadButton.classList.add('hidden');
+                generatedImage.style.opacity = '0';
+                placeholderText.textContent = 'AIがイメージを作成中です...';
+                resultContainer.classList.add('border-dashed', 'border-gray-300');
+            } else {
+                buttonText.textContent = '4. 動物キャラを生成する';
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+
+        // =====================================================================
+        // 画像生成のメイン関数
+        // =====================================================================
+        window.generateImage = async function() {
+            // APIキーを取得 (Canvas外ではユーザーが入力したキーを使用)
+            const userApiKey = apiKeyInput.value.trim();
+            
+            // 画像アップロードのチェック
+            if (!currentBase64Image) {
+                displayMessage('変換したい画像をアップロードしてください。', 'error');
+                return;
+            }
+
+            // 外部環境での実行時（このCanvas環境外）にキーの有無をチェック
+            // 以下の条件は、「__initial_auth_tokenが未定義」かつ「ユーザーがAPIキーを入力していない」場合にtrueになります。
+            if (typeof __initial_auth_token === 'undefined' && userApiKey === "") {
+                displayMessage('外部サイトで実行する場合、Gemini APIキーを入力フィールドに設定してください。', 'error');
+                return;
+            }
+
+            // API URLの構築: ユーザーキーがあればそれを使用し、Canvas環境では空のまま（実行時に提供される）
+            const apiKeyToUse = userApiKey || "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${apiKeyToUse}`;
+
+
+            // プロンプトの生成
+            const description = 'person in the uploaded image';
+            const animal = animalSelect.options[animalSelect.selectedIndex].text.split(' ')[0];
+            const style = styleSelect.options[styleSelect.selectedIndex].text;
+            
+            const prompt = `Transform the ${description} into a cute and friendly ${animal} character. Maintain the original person's pose, facial expression, and main features (e.g., clothing, accessories). Render the final image in a high-quality, professional, ${style}. Soft, bright lighting, high detail, studio quality.`;
+            
+            setProcessingState(true);
+
+            generatedImage.classList.add('hidden');
+            placeholderText.classList.remove('hidden');
+            
+            // Gemini API用のペイロード構築（画像とテキストを含む）
+            const contents = [
+                {
+                    role: "user",
+                    parts: [
+                        { text: prompt },
+                        { inlineData: {
+                            mimeType: currentBase64Image.mimeType,
+                            data: currentBase64Image.data
+                        }}
+                    ]
+                }
+            ];
+
+            const payload = {
+                contents: contents,
+                generationConfig: {
+                    responseModalities: ["IMAGE"], 
+                },
+            };
+
+            const maxRetries = 5;
+            let currentRetry = 0;
+
+            while (currentRetry < maxRetries) {
+                try {
+                    const response = await fetch(apiUrl, { // apiUrlを使用
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`APIリクエストが失敗しました: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    // Base64画像データの抽出
+                    const base64DataPart = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+                    const base64Data = base64DataPart?.inlineData?.data;
+                    const mimeType = base64DataPart?.inlineData?.mimeType || 'image/png';
+
+
+                    if (!base64Data) {
+                        const blockReason = result?.candidates?.[0]?.safetyRatings?.some(r => r.probability === 'HIGH' || r.probability === 'MEDIUM');
+                        const errorMessage = blockReason ? 
+                            'セキュリティポリシーにより画像生成がブロックされました。別の画像または設定を試してください。' : 
+                            'AIからの画像データ取得に失敗しました。';
+                        throw new Error(errorMessage);
+                    }
+
+                    // 画像の表示とダウンロードリンクの準備
+                    const imageUrl = `data:${mimeType};base64,${base64Data}`;
+                    generatedImage.src = imageUrl;
+                    
+                    const imageBlob = base64ToBlob(base64Data, mimeType);
+                    const blobUrl = URL.createObjectURL(imageBlob);
+                    downloadButton.href = blobUrl;
+                    
+                    // UIの更新
+                    placeholderText.classList.add('hidden');
+                    generatedImage.classList.remove('hidden');
+                    downloadButton.classList.remove('hidden');
+                    resultContainer.classList.remove('border-dashed', 'border-gray-300');
+
+                    setTimeout(() => {
+                        generatedImage.style.opacity = '1';
+                    }, 50);
+
+                    displayMessage('画像が正常に生成されました！', 'success');
+                    setProcessingState(false);
+                    return; // 成功
+
+                } catch (error) {
+                    currentRetry++;
+                    console.error(`Attempt ${currentRetry} failed:`, error);
+                    
+                    if (currentRetry < maxRetries) {
+                        const delay = Math.pow(2, currentRetry) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        // 最大リトライ回数に達した場合
+                        displayMessage(`エラー: 画像生成に失敗しました (${error.message})。時間を置いて再試行してください。`, 'error');
+                        placeholderText.classList.remove('hidden');
+                        placeholderText.textContent = 'エラーが発生しました。再試行してください。';
+                        setProcessingState(false);
+                        return;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
